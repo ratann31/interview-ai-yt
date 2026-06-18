@@ -14,7 +14,8 @@ app.use(cors({
 
         const allowedOrigins = [
             "http://localhost:5173",
-            "https://interview-ai-yt-1-ud6e.onrender.com"
+            "https://interview-ai-yt-1-ud6e.onrender.com",
+            "https://interview-ai-frontend-qt6d.onrender.com"
         ];
 
         if (allowedOrigins.indexOf(origin) === -1) {
