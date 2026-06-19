@@ -13,12 +13,13 @@ app.use(cors({
         if (!origin) return callback(null, true);
 
         const allowedOrigins = [
-            "http://localhost:5173",
             "https://interview-ai-yt-1-ud6e.onrender.com",
             "https://interview-ai-frontend-qt6d.onrender.com"
         ];
 
-        if (allowedOrigins.indexOf(origin) === -1) {
+        const isLocalhost = /^http:\/\/localhost:\d+$/.test(origin);
+
+        if (!isLocalhost && allowedOrigins.indexOf(origin) === -1) {
             const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
             return callback(new Error(msg), false);
         }

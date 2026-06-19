@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: "https://interview-ai-yt-v95t.onrender.com",
+    baseURL: import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "" : "https://interview-ai-yt-v95t.onrender.com"),
     withCredentials: true,
 })
 
