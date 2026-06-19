@@ -1,7 +1,7 @@
 const { GoogleGenAI } = require("@google/genai")
 const { z } = require("zod")
 const { zodToJsonSchema } = require("zod-to-json-schema")
-const puppeteer = require("puppeteer")
+const { buildFallbackResumeHtml, generatePdfFromHtml } = require("../utils/pdf.util")
 
 const ai = process.env.GOOGLE_GENAI_API_KEY
     ? new GoogleGenAI({
@@ -325,31 +325,7 @@ Return only valid JSON that matches the requested schema.`
 
 
 
-async function generatePdfFromHtml(htmlContent) {
-    const browser = await puppeteer.launch()
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: "networkidle0" })
-
-    const pdfBuffer = await page.pdf({
-        format: "A4", margin: {
-            top: "20mm",
-            bottom: "20mm",
-            left: "15mm",
-            right: "15mm"
-        }
-    })
-
-    await browser.close()
-
-    return pdfBuffer
-}
-
-async function generateResumePdf({ resume, selfDescription, jobDescription }) {
-
-    if (!ai) {
-        throw new Error("GOOGLE_GENAI_API_KEY is not configured")
-    }
-
+async function generateResumeHtmlFromAi({ resume, selfDescription, jobDescription }) {
     const resumePdfSchema = z.object({
         html: z.string().describe("The HTML content of the resume which can be converted to PDF using any library like puppeteer")
     })
@@ -367,22 +343,48 @@ async function generateResumePdf({ resume, selfDescription, jobDescription }) {
                         The resume should not be so lengthy, it should ideally be 1-2 pages long when converted to PDF. Focus on quality rather than quantity and make sure to include all the relevant information that can increase the candidate's chances of getting an interview call for the given job description.
                     `
 
-    const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: zodToJsonSchema(resumePdfSchema),
+    let lastError = null
+
+    for (const model of MODEL_CANDIDATES) {
+        try {
+            const response = await ai.models.generateContent({
+                model,
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: zodToJsonSchema(resumePdfSchema),
+                }
+            })
+
+            const jsonContent = JSON.parse(response.text)
+
+            if (!jsonContent?.html) {
+                throw new Error("AI resume response did not include HTML content")
+            }
+
+            return jsonContent.html
         }
-    })
+        catch (error) {
+            lastError = error
+        }
+    }
 
+    throw lastError || new Error("Unable to generate resume HTML from AI")
+}
 
-    const jsonContent = JSON.parse(response.text)
+async function generateResumePdf({ resume, selfDescription, jobDescription, title, matchScore }) {
+    let htmlContent = buildFallbackResumeHtml({ title, resume, jobDescription, selfDescription, matchScore })
 
-    const pdfBuffer = await generatePdfFromHtml(jsonContent.html)
+    if (ai) {
+        try {
+            htmlContent = await generateResumeHtmlFromAi({ resume, selfDescription, jobDescription })
+        }
+        catch (error) {
+            console.error("Falling back to local resume HTML generation:", error?.message || error)
+        }
+    }
 
-    return pdfBuffer
-
+    return generatePdfFromHtml(htmlContent)
 }
 
 module.exports = { generateInterviewReport, generateResumePdf }

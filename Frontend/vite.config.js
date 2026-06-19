@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const API_TARGET = 'https://interview-ai-yt-v95t.onrender.com'
+const API_TARGET = process.env.VITE_API_PROXY_TARGET || 'http://localhost:3001'
 
 // https://vite.dev/config/
 export default defineConfig({

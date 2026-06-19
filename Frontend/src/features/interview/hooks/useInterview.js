@@ -58,18 +58,39 @@ export const useInterview = () => {
 
     const getResumePdf = async (interviewReportId) => {
         setLoading(true)
-        let response = null
         try {
-            response = await generateResumePdf({ interviewReportId })
-            const url = window.URL.createObjectURL(new Blob([ response ], { type: "application/pdf" }))
+            const response = await generateResumePdf({ interviewReportId })
+
+            if (!(response instanceof Blob) || response.type === "application/json") {
+                throw new Error("The server returned an invalid PDF response.")
+            }
+
+            const url = window.URL.createObjectURL(response)
             const link = document.createElement("a")
             link.href = url
             link.setAttribute("download", `resume_${interviewReportId}.pdf`)
             document.body.appendChild(link)
             link.click()
+            link.remove()
+            window.URL.revokeObjectURL(url)
         }
         catch (error) {
-            console.log(error)
+            let message = "Unable to download the resume PDF."
+
+            const data = error.response?.data
+            if (data instanceof Blob) {
+                try {
+                    const parsed = JSON.parse(await data.text())
+                    message = parsed.message || message
+                } catch { }
+            } else if (data?.message) {
+                message = data.message
+            } else if (error.message) {
+                message = error.message
+            }
+
+            console.error(message, error)
+            alert(message)
         } finally {
             setLoading(false)
         }
